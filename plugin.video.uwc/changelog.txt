@@ -1,3 +1,18 @@
+[B]Version 1.1.59[/B]
+New site: Vidz7
+Added: Porndig 4K support
+Added: Porntrex 4K support and quality selector
+Fixed: Porntrex images and category alphabetical order
+
+
+[B]Version 1.1.58[/B]
+Readded: HentaiHaven
+Fixed: Porntrex images
+Fixed: TubePornClassic
+Fixed: Cam4
+Usage of universal resolvers can now be enabled/disabled in addon settings (they should still be configured first in URLResolver).
+
+
 [B]Version 1.1.57[/B]
 New site: PornsLand
 Fixed: Freeomovie pagination

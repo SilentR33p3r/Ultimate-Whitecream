@@ -22,7 +22,7 @@ __scriptname__ = "Ultimate Whitecream"
 __author__ = "Whitecream"
 __scriptid__ = "plugin.video.uwc"
 __credits__ = "Whitecream, Fr33m1nd, anton40, NothingGnome, holisticdioxide"
-__version__ = "1.1.57"
+__version__ = "1.1.59"
 
 import urllib
 import urllib2
@@ -404,20 +404,21 @@ def getHtml(url, referer='', hdr=None, NoCookie=None, data=None):
         if response.info().get('Content-Encoding') == 'gzip':
             buf = StringIO( response.read())
             f = gzip.GzipFile(fileobj=buf)
-            data = f.read()
+            result = f.read()
             f.close()
         else:
-            data = response.read()
+            result = response.read()
         if not NoCookie:
             # Cope with problematic timestamp values on RPi on OpenElec 4.2.1
             try:
                 cj.save(cookiePath)
-            except: pass
+            except:
+                pass
         response.close()
     except urllib2.HTTPError as e:
-        data = e.read()
-        if e.code == 503 and 'cf-browser-verification' in data:
-            data = cloudflare.solve(url,cj, USER_AGENT)
+        result = e.read()
+        if e.code == 503 and 'cf-browser-verification' in result:
+            result = cloudflare.solve(url,cj, USER_AGENT)
         else:
             raise urllib2.HTTPError()
     except Exception as e:
@@ -428,7 +429,27 @@ def getHtml(url, referer='', hdr=None, NoCookie=None, data=None):
             notify('Oh oh','It looks like this website is down.')
             raise urllib2.HTTPError()
         return None
-    return data
+    if 'sucuri_cloudproxy_js' in result:
+        headers['Cookie'] = get_sucuri_cookie(result)
+        result = getHtml(url, referer, hdr=headers)
+    return result
+
+
+def get_sucuri_cookie(html):
+    s = re.compile("S\s*=\s*'([^']+)").findall(html)[0]
+    s = base64.b64decode(s)
+    s = s.replace(' ', '')
+    s = re.sub('String\.fromCharCode\(([^)]+)\)', r'chr(\1)', s)
+    s = re.sub('\.slice\((\d+),(\d+)\)', r'[\1:\2]', s)
+    s = re.sub('\.charAt\(([^)]+)\)', r'[\1]', s)
+    s = re.sub('\.substr\((\d+),(\d+)\)', r'[\1:\1+\2]', s)
+    s = re.sub(';location.reload\(\);', '', s)
+    s = re.sub(r'\n', '', s)
+    s = re.sub(r'document\.cookie', 'cookie', s)
+    sucuri_cookie = '' ; exec(s)
+    sucuri_cookie = re.compile('([^=]+)=(.*)').findall(sucuri_cookie)[0]
+    sucuri_cookie = '%s=%s' % (sucuri_cookie[0], sucuri_cookie[1])
+    return sucuri_cookie
 
 
 def postHtml(url, form_data={}, headers={}, compression=True, NoCookie=None):
@@ -767,6 +788,40 @@ def textBox(heading,announce):
         xbmc.sleep(500)
 
 
+def selector(dialog_name, select_from, dont_ask_valid=False, sort_by=None, reverse=False):
+    '''
+    Shows a dialog where the user can choose from the values provided
+    Returns the value of the selected key, or None if no selection was made
+    
+    Usage:
+        dialog_name = title of the dialog shown
+        select_from = a list or a dictionary which contains the options
+
+        optional arguments
+        dont_ask_valid (False) = sets if dontask addon setting should be considered
+                         if True, the dialog won't be shown and the first element
+                         will be selected automatically
+        sort_by (None) = in case of dictionaries the keys will be sorted according this value
+                  in case of a list, the list will be ordered
+        reverse (False) = sets if order should be reversed
+    '''
+    if isinstance(select_from, dict):
+        keys = sorted(list(select_from.keys()), key=sort_by, reverse=reverse)
+        values = [select_from[x] for x in keys]
+    else:
+        keys = sorted(select_from, key=sort_by, reverse=reverse)
+        values = None
+    if not keys:
+        return None
+    if (dont_ask_valid and addon.getSetting("dontask") == "true") or len(keys) == 1:
+        selected = 0
+    else:
+        selected = dialog.select(dialog_name, keys)
+    if selected == -1:
+        return None
+    return values[selected] if values else keys[selected]
+
+
 class VideoPlayer():
     def __init__(self, name, download=False, regex=None):
         self.regex = regex if regex else '''(?:src|SRC|href|HREF)=\s*["']([^'"]+)'''
@@ -807,7 +862,7 @@ class VideoPlayer():
                 new_list.append(source)
         return new_list
 
-    def play_from_site_link(self, url, referrer=None):
+    def play_from_site_link(self, url, referrer=''):
         self.progress.update(25, "", "Loading video page", "")
         html = getHtml(url, referrer)
         html += self._check_suburls(html, url)
@@ -823,7 +878,8 @@ class VideoPlayer():
             hdr['Referer'] = selected
             self.play_from_direct_link(selected)
         else:
-            sources = self._clean_urls([urlresolver.HostedMediaFile(x, title=x.split('/')[2]) for x in urlresolver.scrape_supported(html, self.regex)])
+            use_universal = True if addon.getSetting("universal_resolvers") == "true" else False
+            sources = self._clean_urls([urlresolver.HostedMediaFile(x, title=x.split('/')[2], include_universal=use_universal) for x in urlresolver.scrape_supported(html, self.regex)])
             if not sources:
                 notify('Oh oh','Could not find a supported link')
                 return
@@ -857,18 +913,17 @@ class VideoPlayer():
         sdurl = re.compile(r'streamdefence\.com/view.php\?ref=([^"]+)"', re.DOTALL | re.IGNORECASE).findall(html)
         sdurl_world = re.compile(r'.strdef\.world/([^"]+)', re.DOTALL | re.IGNORECASE).findall(html)
         fcurl = re.compile(r'filecrypt\.cc/Container/([^\.]+)\.html', re.DOTALL | re.IGNORECASE).findall(html)
+        if klurl or sdurl or sdurl_world or fcurl:
+            html = ''
+            self.progress.update(30, "", "Found subsites", "")
         if klurl:
-            self.progress.update(30, "", "Found keeplinks url", "")
-            html = self._solve_keep_links(klurl)
+            html += self._solve_keep_links(klurl)
         elif sdurl:
-            self.progress.update(30, "", "Found streamdefence url", "")
-            html = self._solve_streamdefence(sdurl, referrer_url, False)
+            html += self._solve_streamdefence(sdurl, referrer_url, False)
         elif sdurl_world:
-            self.progress.update(30, "", "Found streamdefence url", "")
-            html = self._solve_streamdefence(sdurl_world, referrer_url, True)
+            html += self._solve_streamdefence(sdurl_world, referrer_url, True)
         elif fcurl:
-            self.progress.update(30, "", "Found filecrypt url", "")
-            html = self._solve_filecrypt(fcurl, referrer_url)
+            html += self._solve_filecrypt(fcurl, referrer_url)
         return html
 
     def _solve_keep_links(self, klurls):

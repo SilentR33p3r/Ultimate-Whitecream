@@ -15,13 +15,13 @@
 
 from urlresolver.plugins.__generic_resolver__ import GenericResolver
 
-class BitPornoResolver(GenericResolver):
-    name = "bitporno"
-    domains = ['bitporno.com']
-    pattern = '(?://|\.)(bitporno\.com)/(?:embed)/([0-9a-zA-Z]+)'
+class ImperioPornoResolver(GenericResolver):
+    name = "imperioporno"
+    domains = ['imperioporno.tv']
+    pattern = '(?://|\.)(imperioporno\.tv)/wp-content/plugins/repro/video.php([0-9a-zA-Z?=.&]+)'
     
     def get_url(self, host, media_id):
-        return self._default_get_url(host, media_id, template='https://www.bitporno.com/?v={media_id}')
+        return self._default_get_url(host, media_id, template='https://www.Imperioporno.tv/wp-content/plugins/repro/video.php{media_id}')
 
     @classmethod
     def _is_enabled(cls):

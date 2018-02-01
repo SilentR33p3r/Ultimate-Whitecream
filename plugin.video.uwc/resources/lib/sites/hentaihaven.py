@@ -17,16 +17,23 @@
 '''
 
 import re
+import base64
 
 import xbmcplugin
 from resources.lib import utils
 
 
+headers = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0',
+           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+           'Accept-Encoding': 'gzip',
+           'Accept-Language': 'en-US,en;q=0.5'}
+
+
 @utils.url_dispatcher.register('460')
 def Main():
-    utils.addDir('[COLOR hotpink]Categories[/COLOR]','http://hentaihaven.org/pick-your-poison/',463,'','')
-    utils.addDir('[COLOR hotpink]A to Z[/COLOR]','http://hentaihaven.org/pick-your-series/',464,'','')
-    utils.addDir('[COLOR hotpink]Uncensored[/COLOR]','http://hentaihaven.org/ajax.php?action=pukka_infinite_scroll&page_no=1&grid_params=infinite_scroll=on&infinite_page=2&infinite_more=true&current_page=taxonomy&front_page_cats=&inner_grid%5Buse_inner_grid%5D=on&inner_grid%5Btax%5D=post_tag&inner_grid%5Bterm_id%5D=53&inner_grid%5Bdate%5D=&search_query=&tdo_tag=uncensored&sort=date',461,'','')
+    utils.addDir('[COLOR hotpink]Categories[/COLOR]', 'http://hentaihaven.org/pick-your-poison/', 463, '', '')
+    utils.addDir('[COLOR hotpink]A to Z[/COLOR]', 'http://hentaihaven.org/pick-your-series/', 464, '', '')
+    utils.addDir('[COLOR hotpink]Uncensored[/COLOR]', 'http://hentaihaven.org/ajax.php?action=pukka_infinite_scroll&page_no=1&grid_params=infinite_scroll=on&infinite_page=2&infinite_more=true&current_page=taxonomy&front_page_cats=&inner_grid%5Buse_inner_grid%5D=on&inner_grid%5Btax%5D=post_tag&inner_grid%5Bterm_id%5D=53&inner_grid%5Bdate%5D=&search_query=&tdo_tag=uncensored&sort=date', 461, '', '')
     List('http://hentaihaven.org/ajax.php?action=pukka_infinite_scroll&page_no=1&grid_params=infinite_scroll=on')
     xbmcplugin.endOfDirectory(utils.addon_handle)
 
@@ -36,14 +43,13 @@ def List(url):
     try:
         listhtml = utils.getHtml(url, '')
     except:
-        
         return None
     listhtml = listhtml.replace('\\','')
     match1 = re.compile('<a\s+class="thumbnail-image" href="([^"]+)".*?data-src="([^"]+)"(.*?)<h3>[^>]+>([^<]+)<', re.DOTALL | re.IGNORECASE).findall(listhtml)
     for videopage, img, other, name in match1:
         name = utils.cleantext(name)
         if 'uncensored' in other:
-            name = name + " [COLOR hotpink]Uncensored[/COLOR]"        
+            name = name + " [COLOR orange]Uncensored[/COLOR]"        
         utils.addDownLink(name, videopage, 462, img, '')
     try:
         page = re.compile('page_no=(\d+)', re.DOTALL | re.IGNORECASE).findall(url)[0]
@@ -53,7 +59,8 @@ def List(url):
         if int(maxpages) > page:
             nextp = url.replace("no="+str(page),"no="+str(npage))
             utils.addDir('Next Page ('+str(npage)+')', nextp,461,'')
-    except: pass
+    except:
+        pass
     xbmcplugin.endOfDirectory(utils.addon_handle)
 
 
@@ -65,6 +72,8 @@ def Playvid(url, name, download=None):
     else:
         videourl = re.compile('class="btn btn-1 btn-1e" href="([^"]+)" target="_blank"', re.DOTALL | re.IGNORECASE).findall(videopage)[0]
     if videourl:
+        if 'play.php' in videourl:
+            videourl = utils.getVideoLink(videourl, url)
         utils.playvid(videourl, name, download)
     else:
         utils.notify('Oh oh','Couldn\'t find a video')
@@ -89,4 +98,3 @@ def A2Z(url):
             name = name + " [COLOR hotpink]Uncensored[/COLOR]"
         utils.addDir(name, catpage, 461, img)    
     xbmcplugin.endOfDirectory(utils.addon_handle)
-
