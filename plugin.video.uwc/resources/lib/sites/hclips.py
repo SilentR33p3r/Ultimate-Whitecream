@@ -1,7 +1,8 @@
+#-*- coding: utf-8 -*-
+
 '''
     Ultimate Whitecream
-    Copyright (C) 2015 Whitecream
-    Copyright (C) 2015 anton40
+    Copyright (C) 2018 Whitecream, anton40, holisticdioxide
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -112,13 +113,33 @@ def ChannelList(url):
 
 @utils.url_dispatcher.register('382', ['url', 'name'], ['download'])    
 def Playvid(url, name, download=None):
+    vp = utils.VideoPlayer(name, download)
+    vp.progress.update(25, "", "Loading video page", "")
     html = utils.getHtml(url, '')
-    videourl = re.compile("video_url: '([^']+)").findall(html)
-    videourl = videourl[0]
-    if download == 1:
-        utils.downloadVideo(videourl, name)
-    else:    
-        iconimage = xbmc.getInfoImage("ListItem.Thumb")
-        listitem = xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
-        listitem.setInfo('video', {'Title': name, 'Genre': 'Porn'})
-        xbmc.Player().play(videourl, listitem)
+    videourl = re.compile('video_url="([^"]+)"').findall(html)
+    videourl = decrypt_hclips(videourl[0])
+    vp.play_from_direct_link(videourl)
+
+
+def decrypt_hclips(video_url):
+    chars = []
+    counter = 0
+    video_url = video_url.decode('utf-8')
+    while counter < len(video_url):
+        smth_1 = u'АВСDЕFGHIJKLМNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,~'.index(video_url[counter])
+        counter += 1
+        smth_2 = u'АВСDЕFGHIJKLМNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,~'.index(video_url[counter])
+        counter += 1
+        smth_3 = u'АВСDЕFGHIJKLМNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,~'.index(video_url[counter])
+        counter += 1
+        smth_4 = u'АВСDЕFGHIJKLМNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,~'.index(video_url[counter])
+        counter += 1
+        smth_1 = smth_1 << 2 | smth_2 >> 4
+        smth_2 = (smth_2 & 15) << 4 | smth_3 >> 2
+        smth_5 = (smth_3 & 3) << 6 | smth_4
+        chars.append(smth_1)
+        if 64 != smth_3:
+            chars.append(smth_2)
+        if 64 != smth_4:
+            chars.append(smth_5)
+    return ''.join(map(unichr, chars))

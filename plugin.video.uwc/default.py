@@ -148,15 +148,32 @@ def ONELIST(page=1):
 
 @utils.url_dispatcher.register('4', ['url'])
 def OpenDownloadFolder(url):
-    xbmc.executebuiltin('ActivateWindow(Videos, '+url+')')
+    xbmc.executebuiltin('ActivateWindow(Videos, ' + url + ')')
+
+
+@utils.url_dispatcher.register('8')
+def smrSettings():
+    try:
+        import resolveurl
+        resolveurl.display_settings()
+    except ImportError:
+        pass
 
 
 def change():
-    if os.path.isfile(utils.uwcchange):
-        heading = '[B][COLOR hotpink]Whitecream[/COLOR] [COLOR white]Changelog[/COLOR][/B]'
-        utils.textBox(heading,utils.uwcchange)
-        os.remove(utils.uwcchange)
-
+    if addon.getSetting('changelog_seen_version') == utils.__version__ or not os.path.isfile(utils.changelog):
+        return
+    addon.setSetting('changelog_seen_version', utils.__version__)
+    heading = '[B][COLOR hotpink]Whitecream[/COLOR] [COLOR white]Changelog[/COLOR][/B]'
+    with open(utils.changelog) as f:
+        cl_lines = f.readlines()
+    announce = ''
+    for line in cl_lines:
+        if not line.strip():
+            break
+        announce += line
+    utils.textBox(heading, announce)
+    
 
 if not addon.getSetting('uwcage') == 'true':
     age = dialog.yesno('WARNING: This addon contains adult material.','You may enter only if you are at least 18 years of age.', nolabel='Exit', yeslabel='Enter')
