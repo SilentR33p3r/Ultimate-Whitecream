@@ -22,7 +22,7 @@ __scriptname__ = "Ultimate Whitecream"
 __author__ = "Whitecream"
 __scriptid__ = "plugin.video.uwc"
 __credits__ = "Whitecream, Fr33m1nd, anton40, NothingGnome, holisticdioxide"
-__version__ = "1.1.60"
+__version__ = "1.1.63"
 
 import urllib
 import urllib2
@@ -49,9 +49,9 @@ import resolveurl
 import xbmcvfs
 from functools import wraps
 
-uwc_plugins_path = 'special://home/addons/plugin.video.uwc/resources/urlresolver_plugins/'
-if xbmcvfs.exists(uwc_plugins_path):
-    resolveurl.add_plugin_dirs(xbmc.translatePath(uwc_plugins_path))
+xxx_plugins_path = 'special://home/addons/script.module.resolveurl.xxx/resources/plugins/'
+if xbmcvfs.exists(xxx_plugins_path):
+    resolveurl.add_plugin_dirs(xbmc.translatePath(xxx_plugins_path))
 
 from url_dispatcher import URL_Dispatcher
 
@@ -362,6 +362,9 @@ def playvid(videourl, name, download=None):
         iconimage = xbmc.getInfoImage("ListItem.Thumb")
         listitem = xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
         listitem.setInfo('video', {'Title': name, 'Genre': 'Porn'})
+        if '.mpd' in videourl:
+            listitem.setProperty('inputstreamaddon','inputstream.adaptive')
+            listitem.setProperty('inputstream.adaptive.manifest_type','mpd')
         xbmc.Player().play(videourl, listitem)
 
 
@@ -526,6 +529,10 @@ def cleantext(text):
     text = text.replace('&#039;','`')
     text = text.replace('&ntilde;','ñ')
     text = text.replace('&rsquo;','\'')
+    text = text.replace('&#133;','...')
+    text = text.replace('&#40;', '(')
+    text = text.replace('&#41;', ')')
+    text = text.replace('&nbsp;', ' ')
     return text.strip()
 
 
@@ -536,8 +543,7 @@ def cleanhtml(raw_html):
 
 def addDownLink(name, url, mode, iconimage, desc='', stream=None, fav='add', noDownload=False):
     contextMenuItems = []
-    if fav == 'add': favtext = "Add to"
-    elif fav == 'del': favtext = "Remove from"
+    favtext = "Remove from" if fav == 'del' else "Add to" # fav == 'add' or 'del'
     u = (sys.argv[0] +
          "?url=" + urllib.quote_plus(url) +
          "&mode=" + str(mode) +
@@ -555,7 +561,7 @@ def addDownLink(name, url, mode, iconimage, desc='', stream=None, fav='add', noD
          "&img=" + urllib.quote_plus(iconimage) +
          "&name=" + urllib.quote_plus(name))
     ok = True
-    if len(iconimage) < 1:
+    if not iconimage:
         iconimage = uwcicon
     liz = xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
     liz.setArt({'thumb': iconimage, 'icon': iconimage})
@@ -566,15 +572,24 @@ def addDownLink(name, url, mode, iconimage, desc='', stream=None, fav='add', noD
     liz.setArt({'fanart': fanart})
     if stream:
         liz.setProperty('IsPlayable', 'true')
-    if len(desc) < 1:
-        liz.setInfo(type="Video", infoLabels={"Title": name})
-    else:
+    if desc:
         liz.setInfo(type="Video", infoLabels={"Title": name, "plot": desc, "plotoutline": desc})
+    else:
+        liz.setInfo(type="Video", infoLabels={"Title": name})
     video_streaminfo = {'codec': 'h264'}
     liz.addStreamInfo('video', video_streaminfo)
-    contextMenuItems.append(('[COLOR hotpink]' + favtext + ' favorites[/COLOR]', 'xbmc.RunPlugin('+favorite+')'))
-    if noDownload == False:
-        contextMenuItems.append(('[COLOR hotpink]Download Video[/COLOR]', 'xbmc.RunPlugin('+dwnld+')'))
+    contextMenuItems.append(('[COLOR hotpink]' + favtext + ' favorites[/COLOR]', 'xbmc.RunPlugin(' + favorite + ')'))
+    if fav == 'del':
+        favorite_move_to_end = (sys.argv[0] +
+            "?url=" + urllib.quote_plus(url) +
+            "&fav=" + 'move_to_end' +
+            "&favmode=" + str(mode) +
+            "&mode=" + str('900') +
+            "&img=" + urllib.quote_plus(iconimage) +
+            "&name=" + urllib.quote_plus(name))
+        contextMenuItems.append(('[COLOR hotpink]Move favorite to end[/COLOR]', 'xbmc.RunPlugin(' + favorite_move_to_end + ')'))
+    if not noDownload:
+        contextMenuItems.append(('[COLOR hotpink]Download Video[/COLOR]', 'xbmc.RunPlugin(' + dwnld + ')'))
     liz.addContextMenuItems(contextMenuItems, replaceItems=False)
     ok = xbmcplugin.addDirectoryItem(handle=addon_handle, url=u, listitem=liz, isFolder=False)
     return ok
@@ -702,6 +717,7 @@ def streamdefence(html):
 
 
 def searchDir(url, mode, page=None):
+    addDir('[COLOR hotpink]Add Keyword[/COLOR]', url, 902, uwcimage('uwc-search.png'), '', mode, Folder=False)
     conn = sqlite3.connect(favoritesdb)
     c = conn.cursor()
     try:
@@ -709,15 +725,15 @@ def searchDir(url, mode, page=None):
         for (keyword,) in c.fetchall():
             name = '[COLOR deeppink]' + urllib.unquote_plus(keyword) + '[/COLOR]'
             addDir(name, url, mode, uwcimage('uwc-search.png'), page=page, keyword=keyword)
-    except: pass
-    addDir('[COLOR hotpink]Add Keyword[/COLOR]', url, 902, uwcimage('uwc-search.png'), '', mode, Folder=False)
-    addDir('[COLOR hotpink]Clear list[/COLOR]', '', 903, uwcimage('uwc-search.png'), Folder=False)
+    except:
+        pass
     xbmcplugin.endOfDirectory(addon_handle)
 
 @url_dispatcher.register('902', ['url', 'channel'])
 def newSearch(url, channel):
     vq = _get_keyboard(heading="Searching for...")
-    if (not vq): return False, 0
+    if not vq:
+        return False, 0
     title = urllib.quote_plus(vq)
     addKeyword(title)
     xbmc.executebuiltin('Container.Refresh')
@@ -736,6 +752,7 @@ def clearSearch():
 def addKeyword(keyword):
     xbmc.log(keyword)
     conn = sqlite3.connect(favoritesdb)
+    conn.text_factory = str
     c = conn.cursor()
     c.execute("INSERT INTO keywords VALUES (?)", (keyword,))
     conn.commit()
@@ -756,10 +773,92 @@ def delKeyword(keyword):
     xbmc.log('keyword: ' + keyword)
     conn = sqlite3.connect(favoritesdb)
     c = conn.cursor()
-    c.execute("DELETE FROM keywords WHERE keyword = '%s'" % keyword)
+    c.execute("DELETE FROM keywords WHERE keyword = ?" (keyword,))
     conn.commit()
     conn.close()
     xbmc.executebuiltin('Container.Refresh')
+
+
+@url_dispatcher.register('908')
+def backup_keywords():
+    path = xbmcgui.Dialog().browseSingle(0, 'Select directory to place backup' ,'myprograms')
+    progress.create('Backing up', 'Initializing')
+    if not path:
+        return
+    import json
+    import gzip
+    import datetime
+    progress.update(25, "Reading database")
+    conn = sqlite3.connect(favoritesdb)
+    conn.text_factory = str
+    c = conn.cursor()
+    c.execute("SELECT * FROM keywords")
+    keywords = [{"keyword": keyword} for (keyword,) in c.fetchall()]
+    if not keywords:
+        progress.close()
+        notify("Keywords empty", "No keywords to back up")
+        return
+    conn.close()
+    time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    backup_content = {"meta": {"type": "uwc-keywords", "version": 1, "datetime": time}, "data": keywords}
+    if progress.iscanceled():
+        progress.close()
+        return
+    progress.update(75, "Writing backup file")
+    filename = "uwc-keywords_" + time + '.bak'
+    try:
+        with gzip.open(path + filename, "wb") as fav_file:
+            json.dump(backup_content, fav_file)
+    except IOError:
+        progress.close()
+        notify("Error: invalid path", "Do you have permission to write to the selected folder?")
+        return
+    progress.close()
+    dialog.ok("Backup complete", "Backup file: {}".format(path + filename))
+
+
+def check_if_keyword_exists(keyword):
+    conn = sqlite3.connect(favoritesdb)
+    conn.text_factory = str
+    c = conn.cursor()
+    c.execute("SELECT * FROM keywords WHERE keyword = ?", (keyword,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return True
+    return False
+
+
+@url_dispatcher.register('909')
+def restore_keywords():
+    path = dialog.browseSingle(1, 'Select backup file' ,'myprograms')
+    if not path:
+        return
+    import json
+    import gzip
+    try:
+        with gzip.open(path, "rb") as fav_file:
+            backup_content = json.load(fav_file)
+    except (ValueError, IOError):
+        notify("Error", "Invalid backup file")
+        return
+    if not backup_content["meta"]["type"] == "uwc-keywords":
+        notify("Error", "Invalid backup file")
+        return
+    keywords = backup_content["data"]
+    if not keywords:
+        notify("Error", "Empty backup")
+    added = 0
+    skipped = 0
+    for keyword in keywords:
+        keyw = keyword['keyword']
+        if check_if_keyword_exists(keyw):
+            skipped += 1
+        else:
+            addKeyword(keyw)
+            added += 1
+    xbmc.executebuiltin('Container.Refresh')
+    dialog.ok("Restore complete", "Restore skips items that are already present in keywords to avoid duplicates", "Added: {}".format(added), "Skipped: {}".format(skipped))
 
 
 def textBox(heading,announce):
@@ -818,9 +917,9 @@ def selector(dialog_name, select_from, dont_ask_valid=False, sort_by=None, rever
 
 
 class VideoPlayer():
-    def __init__(self, name, download=False, regex=None, direct_regex=None):
-        self.regex = regex if regex else '''(?:src|SRC|href|HREF)=\s*["']([^'"]+)'''
-        self.direct_regex = direct_regex if direct_regex else """<source.*?src=(?:"|')([^"']+)[^>]+>"""
+    def __init__(self, name, download=False, regex='''(?:src|SRC|href|HREF)=\s*["']([^'"]+)''', direct_regex="""<source.*?src=(?:"|')([^"']+)[^>]+>"""):
+        self.regex = regex
+        self.direct_regex = direct_regex
         self.name = name
         self.download = download
         self.progress = xbmcgui.DialogProgress()
@@ -837,7 +936,7 @@ class VideoPlayer():
 
     def _clean_urls(self, url_list):
         filtered_words = ['google']
-        filtered_ends = ['.js', '.css', '/premium.html']
+        filtered_ends = ['.js', '.css', '/premium.html', '.jpg', '.gif', '.png', '.ico']
         added = set()
         new_list = []
         for source in url_list:
@@ -867,18 +966,24 @@ class VideoPlayer():
     @_cancellable
     def play_from_html(self, html):
         self.progress.update(50, "", "Searching for supported hosts", "")
-        direct_links = re.compile(self.direct_regex, re.DOTALL | re.IGNORECASE).findall(html)
-        if direct_links:
-            selected = 'https:' + direct_links[0] if direct_links[0].startswith('//') else direct_links[0]
-            self.progress.update(50, "", "", "Playing from direct link")
-            self.play_from_direct_link(selected)
-        else:
+        direct_links = None
+        if self.direct_regex:
+            direct_links = re.compile(self.direct_regex, re.DOTALL | re.IGNORECASE).findall(html)
+            if direct_links:
+                selected = 'https:' + direct_links[0] if direct_links[0].startswith('//') else direct_links[0]
+                self.progress.update(50, "", "", "Playing from direct link")
+                self.play_from_direct_link(selected)
+            elif not self.regex:
+                notify('Oh oh','Could not find a supported link')
+        if self.regex and not direct_links:
             use_universal = True if addon.getSetting("universal_resolvers") == "true" else False
             sources = self._clean_urls([resolveurl.HostedMediaFile(x, title=x.split('/')[2], include_universal=use_universal) for x in resolveurl.scrape_supported(html, self.regex)])
             if not sources:
                 notify('Oh oh','Could not find a supported link')
                 return
             self._select_source(sources)
+        if not self.direct_regex and not self.regex:
+            raise ValueError("No regular expression specified")
 
     @_cancellable
     def _select_source(self, sources):

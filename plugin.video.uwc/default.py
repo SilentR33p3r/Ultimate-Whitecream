@@ -81,6 +81,8 @@ def INDEXS():
     utils.addDir('[COLOR hotpink]Vidz7[/COLOR]','http://www.vidz7.com/',640,'','')
     utils.addDir('[COLOR hotpink]YourPorn[/COLOR]','https://yourporn.sexy/',650,os.path.join(imgDir, 'yourpornsexy.png'),'')
     utils.addDir('[COLOR hotpink]JavWhores[/COLOR]','https://www.javwhores.com/',55,os.path.join(imgDir, 'javwhores.png'),'')
+    utils.addDir('[COLOR hotpink]DatoPorn[/COLOR]','http://datoporn.co/',670,os.path.join(imgDir, 'datoporn.png'),'')
+    utils.addDir('[COLOR hotpink]Pornvibe[/COLOR]','https://pornvibe.org/',680,os.path.join(imgDir, 'pornvibe.png'),'')
 
     utils.addDir('[COLOR hotpink]One list, to watch them all[/COLOR]','',5,'',1)
     xbmcplugin.endOfDirectory(utils.addon_handle, cacheToDisc=False)
@@ -134,6 +136,7 @@ def INDEXW():
 @utils.url_dispatcher.register('3')
 def INDEXH():
     utils.addDir('[COLOR hotpink]Hentaihaven[/COLOR]','http://hentaihaven.org/?sort=date',460,os.path.join(imgDir, 'hh.png'),'')
+    utils.addDir('[COLOR hotpink]Animeid Hentai[/COLOR]','https://animeidhentai.com/hentai',660,os.path.join(imgDir, 'ah.png'),'')
     xbmcplugin.endOfDirectory(utils.addon_handle, cacheToDisc=False)    
 
 @utils.url_dispatcher.register('5', ['page'])
@@ -154,11 +157,7 @@ def OpenDownloadFolder(url):
 
 @utils.url_dispatcher.register('8')
 def smrSettings():
-    try:
-        import resolveurl
-        resolveurl.display_settings()
-    except ImportError:
-        pass
+    utils.resolveurl.display_settings()
 
 
 def change():
