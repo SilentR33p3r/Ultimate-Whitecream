@@ -80,6 +80,8 @@ def PTList(url, page=1, onelist=None):
             npage = page + 1
             if '/categories/' in url:
                 url = url.replace('from=' + str(page), 'from=' + str(npage))
+            elif '/search/' in url:
+                url = url.replace('from_videos=' + str(page), 'from_videos=' + str(npage)).replace('from_albums=' + str(page), 'from_albums=' + str(npage))
             else:
                 url = url.replace('/' + str(page) + '/', '/' + str(npage) + '/')
             utils.addDir('Next Page (' + str(npage) + ')', url, 51, '', npage)
@@ -116,7 +118,8 @@ def PTPlayvid(url, name, download=None):
 @utils.url_dispatcher.register('53', ['url'])
 def PTCat(url):
     cathtml = utils.getHtml(url, '')
-    match = re.compile('<a class="item" href="([^"]+)" title="([^"]+)".*?src="([^"]+)"', re.DOTALL | re.IGNORECASE).findall(cathtml)
+    cat_block = re.compile('<span class="icon type-video">(.*?)<div class="footer-margin">', re.DOTALL | re.IGNORECASE).search(cathtml).group(1)
+    match = re.compile('<a class="item" href="([^"]+)" title="([^"]+)".*?src="([^"]+)"', re.DOTALL | re.IGNORECASE).findall(cat_block)
     for catpage, name, img in sorted(match, key=lambda x: x[1]):
         if img.startswith('//'):
             img = 'https:' + img
@@ -132,6 +135,7 @@ def PTSearch(url, keyword=None):
     if not keyword:
         utils.searchDir(url, 54)
     else:
-        title = keyword.replace(' ', '+')
-        searchUrl = searchUrl + title + '/'
+        searchUrl += keyword.replace(' ', '-').replace('+', '-')
+        searchUrl += '/?mode=async&function=get_block&block_id=list_videos_videos_list_search_result&category_ids=&sort_by=relevance&from_videos=1&from_albums=1&q='
+        searchUrl += keyword.replace(' ', '+')
         PTList(searchUrl, 1)
